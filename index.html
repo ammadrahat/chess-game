@@ -1,18 +1,18 @@
-<!DOCTYPE html><html lang="en"><head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Chess Game</title>
-    <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f4f4f4;
-            font-family: Arial, sans-serif;
-        }.status {
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Chess Game</title>
+<style>
+    body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
+    }
+    .status {
         font-size: 18px;
         margin: 10px;
         height: 24px;
@@ -49,20 +49,24 @@
     }
 
     .highlight {
-        border :3px solid black;
+        outline: 3px solid black;
+    }
+
+    .danger {
+        outline: 3px solid red;
     }
 </style>
 
-</head><body>
+</head>
+<body>
     <div id="player1-status" class="status"></div>
     <div class="chessboard" id="chessboard"></div>
-    <div id="player2-status" class="status"></div><script>
-    const pieces = {
-        'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚', 'P': '♟',
-        'r': '♖', 'n': '♘', 'b': '♗', 'q': '♕', 'k': '♔', 'p': '♙'
-    };
-
-    let boardState = [
+    <div id="player2-status" class="status"></div>
+    <script>
+        const pieces = {
+            'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚', 'P': '♟',
+            'r': '♖', 'n': '♘', 'b': '♗', 'q': '♕', 'k': '♔', 'p': '♙'
+        };let boardState = [
         'rnbqkbnr',
         'pppppppp',
         '        ',
@@ -81,29 +85,37 @@
     function renderBoard() {
         chessboard.innerHTML = '';
         updateStatus();
+        let kingInCheck = isKingInCheck(turn);
 
         boardState.forEach((row, rowIndex) => {
             row.split('').forEach((piece, colIndex) => {
                 const square = document.createElement('div');
-                square.classList.add('square', (rowIndex + colIndex) % 2 === 0 ? 'light' : 'dark');
+                square.className = `square ${(rowIndex + colIndex) % 2 === 0 ? 'light' : 'dark'}`;
                 square.dataset.row = rowIndex;
                 square.dataset.col = colIndex;
                 if (piece !== ' ') square.innerText = pieces[piece];
                 square.addEventListener('click', () => handleMove(square, rowIndex, colIndex));
+
+                // Highlight king in danger
+                if (kingInCheck && piece.toLowerCase() === 'k' &&
+                    ((turn === 'w' && piece === piece.toUpperCase()) ||
+                     (turn === 'b' && piece === piece.toLowerCase()))) {
+                    square.classList.add('danger');
+                }
+
                 chessboard.appendChild(square);
             });
         });
     }
 
     function updateStatus() {
-        document.getElementById('player1-status').innerText = turn === 'w' ? 'Player 1 Turn' : '';
-        document.getElementById('player2-status').innerText = turn === 'b' ? 'Player 2 Turn' : '';
+        document.getElementById('player2-status').innerText = turn === 'w' ? 'Player 2 Turn' : '';
+        document.getElementById('player1-status').innerText = turn === 'b' ? 'Player 1 Turn' : '';
     }
 
     function clearHighlights() {
         document.querySelectorAll('.square').forEach(sq => {
-            sq.classList.remove('selected');
-            sq.classList.remove('highlight');
+            sq.classList.remove('selected', 'highlight', 'danger');
         });
     }
 
@@ -119,46 +131,28 @@
         const absCol = Math.abs(deltaCol);
         const dest = boardState[toRow][toCol];
 
-        // Don't allow moving to a square with your own piece
         if (isSameColor(piece, dest)) return false;
 
-        // Pawn
         if (piece === 'P') {
-            if (deltaCol === 0 && boardState[toRow][toCol] === ' ') {
+            if (deltaCol === 0 && dest === ' ') {
                 if (deltaRow === -1) return true;
-                if (fromRow === 6 && deltaRow === -2 && boardState[fromRow - 1][fromCol] === ' ') return true;
+                if (fromRow === 6 && deltaRow === -2 && boardState[5][fromCol] === ' ') return true;
             } else if (absCol === 1 && deltaRow === -1 && dest !== ' ') return true;
-        }
-        else if (piece === 'p') {
-            if (deltaCol === 0 && boardState[toRow][toCol] === ' ') {
+        } else if (piece === 'p') {
+            if (deltaCol === 0 && dest === ' ') {
                 if (deltaRow === 1) return true;
-                if (fromRow === 1 && deltaRow === 2 && boardState[fromRow + 1][fromCol] === ' ') return true;
+                if (fromRow === 1 && deltaRow === 2 && boardState[2][fromCol] === ' ') return true;
             } else if (absCol === 1 && deltaRow === 1 && dest !== ' ') return true;
-        }
-        // Rook
-        else if (piece.toLowerCase() === 'r') {
-            if (fromRow === toRow || fromCol === toCol) {
+        } else if (piece.toLowerCase() === 'r') {
+            if (fromRow === toRow || fromCol === toCol) return clearPath(fromRow, fromCol, toRow, toCol);
+        } else if (piece.toLowerCase() === 'b') {
+            if (absRow === absCol) return clearPath(fromRow, fromCol, toRow, toCol);
+        } else if (piece.toLowerCase() === 'q') {
+            if (fromRow === toRow || fromCol === toCol || absRow === absCol)
                 return clearPath(fromRow, fromCol, toRow, toCol);
-            }
-        }
-        // Bishop
-        else if (piece.toLowerCase() === 'b') {
-            if (absRow === absCol) {
-                return clearPath(fromRow, fromCol, toRow, toCol);
-            }
-        }
-        // Queen
-        else if (piece.toLowerCase() === 'q') {
-            if (fromRow === toRow || fromCol === toCol || absRow === absCol) {
-                return clearPath(fromRow, fromCol, toRow, toCol);
-            }
-        }
-        // King
-        else if (piece.toLowerCase() === 'k') {
+        } else if (piece.toLowerCase() === 'k') {
             return absRow <= 1 && absCol <= 1;
-        }
-        // Knight
-        else if (piece.toLowerCase() === 'n') {
+        } else if (piece.toLowerCase() === 'n') {
             return (absRow === 2 && absCol === 1) || (absRow === 1 && absCol === 2);
         }
 
@@ -177,12 +171,40 @@
         return true;
     }
 
+    function isKingInCheck(currentTurn) {
+        const kingChar = currentTurn === 'w' ? 'K' : 'k';
+        let kingRow, kingCol;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (boardState[r][c] === kingChar) {
+                    kingRow = r;
+                    kingCol = c;
+                    break;
+                }
+            }
+        }
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = boardState[r][c];
+                if (piece !== ' ' && ((currentTurn === 'w' && piece === piece.toLowerCase()) ||
+                                      (currentTurn === 'b' && piece === piece.toUpperCase()))) {
+                    if (isValidMove(piece, r, c, kingRow, kingCol)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     function highlightMoves(piece, fromRow, fromCol) {
-        document.querySelector(`.square[data-row='${fromRow}'][data-col='${fromCol}']`).classList.add('selected');
+        const origin = document.querySelector(`.square[data-row='${fromRow}'][data-col='${fromCol}']`);
+        origin.classList.add('selected');
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 if (isValidMove(piece, fromRow, fromCol, r, c)) {
-                    document.querySelector(`.square[data-row='${r}'][data-col='${c}']`).classList.add('highlight');
+                    const target = document.querySelector(`.square[data-row='${r}'][data-col='${c}']`);
+                    target.classList.add('highlight');
                 }
             }
         }
@@ -200,8 +222,16 @@
             }
         } else {
             if (isValidMove(selectedPiece, selectedSquare.row, selectedSquare.col, row, col)) {
+                const captured = boardState[row][col];
                 boardState[selectedSquare.row] = boardState[selectedSquare.row].substring(0, selectedSquare.col) + ' ' + boardState[selectedSquare.row].substring(selectedSquare.col + 1);
                 boardState[row] = boardState[row].substring(0, col) + selectedPiece + boardState[row].substring(col + 1);
+
+                if (captured.toLowerCase() === 'k') {
+                    alert(`Game over! ${turn === 'w' ? 'White' : 'Black'} wins!`);
+                    location.reload();
+                    return;
+                }
+
                 turn = turn === 'w' ? 'b' : 'w';
             }
             selectedPiece = null;
